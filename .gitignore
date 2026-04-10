@@ -2,5 +2,6 @@
 **/.DS_Store
 
 tmp/
+_site/
 *.zip
 tmp-footer-cta-check.png

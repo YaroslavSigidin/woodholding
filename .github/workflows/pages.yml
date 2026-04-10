@@ -35,8 +35,14 @@ jobs:
           rsync -av --delete \
             --exclude '.git/' \
             --exclude '.github/' \
+            --exclude '.DS_Store' \
             --exclude '.gitignore' \
             --exclude 'README.md' \
+            --exclude 'scripts/' \
+            --exclude 'tmp/' \
+            --exclude '*.zip' \
+            --exclude 'tmp-footer-cta-check.png' \
+            --exclude 'ЛОГО 5.png' \
             ./ _site/
 
       - name: Upload artifact

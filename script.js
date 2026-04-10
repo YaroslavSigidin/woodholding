@@ -3,6 +3,67 @@ const siteNav = document.querySelector(".site-nav");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 document.documentElement.classList.add("has-reveal-motion");
 
+const deferredVideos = [...document.querySelectorAll("video[data-deferred-video]")];
+
+const hydrateDeferredVideo = (video) => {
+  if (!(video instanceof HTMLVideoElement) || video.dataset.videoReady === "true") {
+    return;
+  }
+
+  const sources = [...video.querySelectorAll("source[data-src]")];
+
+  if (!sources.length) {
+    return;
+  }
+
+  sources.forEach((source) => {
+    source.src = source.dataset.src || "";
+    source.removeAttribute("data-src");
+  });
+
+  video.dataset.videoReady = "true";
+  video.load();
+
+  if (reducedMotion || !video.autoplay) {
+    return;
+  }
+
+  const playPromise = video.play();
+
+  if (playPromise && typeof playPromise.catch === "function") {
+    playPromise.catch(() => {});
+  }
+};
+
+if (deferredVideos.length) {
+  if (reducedMotion) {
+    deferredVideos.forEach((video) => {
+      video.removeAttribute("autoplay");
+    });
+  } else if ("IntersectionObserver" in window) {
+    const deferredVideoObserver = new IntersectionObserver(
+      (entries, observer) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+
+          hydrateDeferredVideo(entry.target);
+          observer.unobserve(entry.target);
+        });
+      },
+      {
+        rootMargin: "240px 0px",
+        threshold: 0.05,
+      }
+    );
+
+    deferredVideos.forEach((video) => deferredVideoObserver.observe(video));
+  } else {
+    deferredVideos.forEach(hydrateDeferredVideo);
+  }
+}
+
 if ("scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
 }
