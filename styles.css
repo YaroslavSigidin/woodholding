@@ -4304,6 +4304,68 @@ body.page-sruby-i-doma .other-directions-grid .direction-card {
   padding: var(--space-4);
 }
 
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered {
+  position: relative;
+  align-content: start;
+  min-height: 15.5rem;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  border-color: rgba(18, 17, 16, 0.12);
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .direction-card__cover {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .direction-card__cover img {
+  filter: grayscale(100%) contrast(0.97) sepia(10%) brightness(1.02);
+  transform: none;
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .direction-card__content {
+  position: relative;
+  z-index: 2;
+  align-self: start;
+  gap: 0.45rem;
+  min-height: auto;
+  padding: var(--space-4);
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .card-index,
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered h3,
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered p {
+  color: #121110;
+  text-shadow: none;
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered p {
+  font-size: clamp(0.9rem, 0.86rem + 0.16vw, 1rem);
+  line-height: 1.5;
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered:hover,
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered:focus-within {
+  background: #fff;
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered:hover .direction-card__cover img,
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered:focus-within .direction-card__cover img {
+  filter: grayscale(100%) contrast(0.97) sepia(10%) brightness(1.02);
+  transform: none;
+}
+
 body.page-sruby-i-doma .wireframe-panel {
   position: relative;
   overflow: hidden;
