@@ -4337,10 +4337,15 @@ body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--co
 body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .direction-card__content {
   position: relative;
   z-index: 2;
-  align-self: start;
+  align-self: stretch;
+  align-content: start;
   gap: 0.45rem;
-  min-height: auto;
+  min-height: 100%;
   padding: var(--space-4);
+}
+
+body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered p {
+  margin-top: auto;
 }
 
 body.page-sruby-i-doma .other-directions-grid .direction-card.direction-card--covered .card-index,
