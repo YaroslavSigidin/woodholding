@@ -1,0 +1,188 @@
+name: Deploy Timeweb VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: timeweb-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ secrets.TIMEWEB_PASSWORD != '' }}
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: 72.56.37.198
+      DEPLOY_USER: root
+      DEPLOY_PORT: 22
+      DEPLOY_ROOT: /var/www/woodholding
+      DEFAULT_SITE_URL: http://72.56.37.198
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deploy variables
+        run: |
+          set -euo pipefail
+
+          SITE_URL="${{ vars.TIMEWEB_SITE_URL }}"
+          SERVER_NAME="${{ vars.TIMEWEB_SERVER_NAME }}"
+
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="$DEFAULT_SITE_URL"
+          fi
+
+          if [ -z "$SERVER_NAME" ]; then
+            SERVER_NAME="$DEPLOY_HOST"
+          fi
+
+          echo "SITE_URL=$SITE_URL" >> "$GITHUB_ENV"
+          echo "SERVER_NAME=$SERVER_NAME" >> "$GITHUB_ENV"
+          echo "RELEASE_PATH=$DEPLOY_ROOT/releases/$GITHUB_SHA" >> "$GITHUB_ENV"
+
+      - name: Prepare static artifact
+        run: |
+          set -euo pipefail
+
+          mkdir -p _site
+          rsync -av --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.DS_Store' \
+            --exclude '.gitignore' \
+            --exclude 'README.md' \
+            --exclude 'scripts/' \
+            --exclude 'tmp/' \
+            --exclude '*.zip' \
+            --exclude 'tmp-footer-cta-check.png' \
+            --exclude 'ЛОГО 5.png' \
+            ./ _site/
+
+          node ./scripts/prepare-timeweb-artifact.mjs _site "$SITE_URL"
+
+      - name: Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Bootstrap server
+        env:
+          SSHPASS: ${{ secrets.TIMEWEB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          sshpass -e ssh \
+            -p "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_ROOT='$DEPLOY_ROOT' SERVER_NAME='$SERVER_NAME' bash -s" <<'SSH'
+          set -euo pipefail
+
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y nginx rsync
+
+          mkdir -p "$DEPLOY_ROOT/releases"
+
+          cat > /etc/nginx/sites-available/woodholding.conf <<NGINX
+          server {
+            listen 80 default_server;
+            listen [::]:80 default_server;
+            server_name ${SERVER_NAME} _;
+
+            root ${DEPLOY_ROOT}/current;
+            index index.html;
+            charset utf-8;
+
+            add_header X-Content-Type-Options nosniff always;
+            add_header Referrer-Policy strict-origin-when-cross-origin always;
+            add_header X-Frame-Options SAMEORIGIN always;
+
+            location = /robots.txt {
+              access_log off;
+              log_not_found off;
+              try_files \$uri =404;
+            }
+
+            location = /favicon.ico {
+              access_log off;
+              log_not_found off;
+              try_files \$uri =404;
+            }
+
+            location / {
+              try_files \$uri \$uri/ =404;
+            }
+
+            location ~* \.(?:css|js|jpg|jpeg|png|gif|svg|webp|ico|woff2?|mp4)$ {
+              expires 30d;
+              add_header Cache-Control "public, immutable";
+              try_files \$uri =404;
+            }
+          }
+          NGINX
+
+          ln -sfn /etc/nginx/sites-available/woodholding.conf /etc/nginx/sites-enabled/woodholding.conf
+          rm -f /etc/nginx/sites-enabled/default
+
+          nginx -t
+          systemctl enable nginx
+          systemctl reload nginx || systemctl restart nginx
+          SSH
+
+      - name: Create release directory
+        env:
+          SSHPASS: ${{ secrets.TIMEWEB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          sshpass -e ssh \
+            -p "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$RELEASE_PATH'"
+
+      - name: Upload release
+        env:
+          SSHPASS: ${{ secrets.TIMEWEB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          sshpass -e rsync \
+            -az --delete --chmod=D755,F644 \
+            -e "ssh -p $DEPLOY_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            _site/ \
+            "$DEPLOY_USER@$DEPLOY_HOST:$RELEASE_PATH/"
+
+      - name: Activate release
+        env:
+          SSHPASS: ${{ secrets.TIMEWEB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          sshpass -e ssh \
+            -p "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_ROOT='$DEPLOY_ROOT' RELEASE_PATH='$RELEASE_PATH' bash -s" <<'SSH'
+          set -euo pipefail
+
+          ln -sfn "$RELEASE_PATH" "$DEPLOY_ROOT/current"
+          nginx -t
+          systemctl reload nginx || systemctl restart nginx
+
+          find "$DEPLOY_ROOT/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          SSH
+
+      - name: Verify site
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "$SITE_URL" >/dev/null
+
